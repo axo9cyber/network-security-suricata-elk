@@ -1,0 +1,221 @@
+{
+  "index_patterns": ["suricata-*"],
+  "template": {
+    "settings": {
+      "number_of_shards": 1,
+      "number_of_replicas": 0,
+      "index.refresh_interval": "5s",
+      "index.lifecycle.name": "suricata-ilm-policy",
+      "index.lifecycle.rollover_alias": "suricata"
+    },
+    "mappings": {
+      "dynamic": true,
+      "properties": {
+        "@timestamp": {
+          "type": "date"
+        },
+        "timestamp": {
+          "type": "date",
+          "format": "strict_date_optional_time||epoch_millis"
+        },
+        "event_type": {
+          "type": "keyword"
+        },
+        "flow_id": {
+          "type": "keyword"
+        },
+        "in_iface": {
+          "type": "keyword"
+        },
+        "proto": {
+          "type": "keyword"
+        },
+        "app_proto": {
+          "type": "keyword"
+        },
+        "source": {
+          "properties": {
+            "ip": {
+              "type": "ip"
+            },
+            "port": {
+              "type": "integer"
+            },
+            "geo": {
+              "properties": {
+                "city_name": { "type": "keyword" },
+                "country_name": { "type": "keyword" },
+                "country_iso_code": { "type": "keyword" },
+                "region_name": { "type": "keyword" },
+                "location": { "type": "geo_point" },
+                "continent_name": { "type": "keyword" }
+              }
+            }
+          }
+        },
+        "destination": {
+          "properties": {
+            "ip": {
+              "type": "ip"
+            },
+            "port": {
+              "type": "integer"
+            },
+            "geo": {
+              "properties": {
+                "city_name": { "type": "keyword" },
+                "country_name": { "type": "keyword" },
+                "country_iso_code": { "type": "keyword" },
+                "region_name": { "type": "keyword" },
+                "location": { "type": "geo_point" },
+                "continent_name": { "type": "keyword" }
+              }
+            }
+          }
+        },
+        "alert": {
+          "properties": {
+            "action": {
+              "type": "keyword"
+            },
+            "gid": {
+              "type": "integer"
+            },
+            "signature_id": {
+              "type": "integer"
+            },
+            "rev": {
+              "type": "integer"
+            },
+            "signature": {
+              "type": "text",
+              "fields": {
+                "keyword": { "type": "keyword" }
+              }
+            },
+            "category": {
+              "type": "keyword"
+            },
+            "severity": {
+              "type": "integer"
+            },
+            "severity_label": {
+              "type": "keyword"
+            }
+          }
+        },
+        "http": {
+          "properties": {
+            "hostname": {
+              "type": "keyword"
+            },
+            "url": {
+              "type": "text",
+              "fields": {
+                "keyword": { "type": "keyword" }
+              }
+            },
+            "http_user_agent": {
+              "type": "text",
+              "fields": {
+                "keyword": { "type": "keyword" }
+              }
+            },
+            "http_method": {
+              "type": "keyword"
+            },
+            "protocol": {
+              "type": "keyword"
+            },
+            "status": {
+              "type": "integer"
+            },
+            "length": {
+              "type": "integer"
+            }
+          }
+        },
+        "dns": {
+          "properties": {
+            "type": {
+              "type": "keyword"
+            },
+            "id": {
+              "type": "integer"
+            },
+            "rrname": {
+              "type": "keyword"
+            },
+            "rrtype": {
+              "type": "keyword"
+            },
+            "rcode": {
+              "type": "keyword"
+            },
+            "rdata": {
+              "type": "keyword"
+            },
+            "ttl": {
+              "type": "integer"
+            }
+          }
+        },
+        "tls": {
+          "properties": {
+            "subject": { "type": "keyword" },
+            "issuerdn": { "type": "keyword" },
+            "serial": { "type": "keyword" },
+            "fingerprint": { "type": "keyword" },
+            "sni": { "type": "keyword" },
+            "version": { "type": "keyword" },
+            "notbefore": { "type": "date" },
+            "notafter": { "type": "date" }
+          }
+        },
+        "ssh": {
+          "properties": {
+            "client": {
+              "properties": {
+                "proto_version": { "type": "keyword" },
+                "software_version": { "type": "keyword" }
+              }
+            },
+            "server": {
+              "properties": {
+                "proto_version": { "type": "keyword" },
+                "software_version": { "type": "keyword" }
+              }
+            }
+          }
+        },
+        "flow": {
+          "properties": {
+            "pkts_toserver": { "type": "integer" },
+            "pkts_toclient": { "type": "integer" },
+            "bytes_toserver": { "type": "long" },
+            "bytes_toclient": { "type": "long" },
+            "start": { "type": "date" },
+            "end": { "type": "date" },
+            "age": { "type": "integer" },
+            "state": { "type": "keyword" },
+            "reason": { "type": "keyword" },
+            "alerted": { "type": "boolean" }
+          }
+        },
+        "event": {
+          "properties": {
+            "kind": { "type": "keyword" },
+            "category": { "type": "keyword" },
+            "module": { "type": "keyword" },
+            "dataset": { "type": "keyword" }
+          }
+        },
+        "threat": {
+          "properties": {
+            "category": { "type": "keyword" }
+          }
+        }
+      }
+    }
+  }
+}

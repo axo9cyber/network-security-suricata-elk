@@ -1,0 +1,144 @@
+##############################################################################
+# Docker Compose — ELK Stack pour l'analyse des alertes Suricata
+# Auteur  : axo9cyber
+# Version : ELK 8.x
+##############################################################################
+
+version: "3.8"
+
+services:
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Elasticsearch — Moteur de stockage et de recherche
+  # ──────────────────────────────────────────────────────────────────────────
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.0
+    container_name: elasticsearch
+    environment:
+      - node.name=elasticsearch
+      - cluster.name=suricata-lab
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - xpack.security.enabled=false
+      - xpack.security.http.ssl.enabled=false
+      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+      - ./configs/elasticsearch/index-template.json:/usr/share/elasticsearch/config/templates/suricata-template.json:ro
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    networks:
+      - elk-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -vq '\"status\":\"red\"'"]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+    restart: unless-stopped
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Logstash — Pipeline d'ingestion des logs Suricata
+  # ──────────────────────────────────────────────────────────────────────────
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.12.0
+    container_name: logstash
+    environment:
+      - "LS_JAVA_OPTS=-Xmx512m -Xms512m"
+      - MONITORING_ENABLED=false
+    volumes:
+      - ./configs/logstash/suricata.conf:/usr/share/logstash/pipeline/suricata.conf:ro
+      - ./configs/elasticsearch/index-template.json:/etc/logstash/templates/suricata-template.json:ro
+      # Monter le répertoire de logs Suricata (adapter selon l'environnement)
+      - /var/log/suricata:/var/log/suricata:ro
+      - logstash-data:/usr/share/logstash/data
+    ports:
+      - "5044:5044"   # Beats input
+      - "9600:9600"   # Logstash monitoring API
+    networks:
+      - elk-network
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Kibana — Interface de visualisation et dashboards
+  # ──────────────────────────────────────────────────────────────────────────
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.12.0
+    container_name: kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - SERVER_NAME=kibana-suricata-lab
+      - XPACK_SECURITY_ENABLED=false
+      - XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY=a-32-char-super-secret-key-here!
+    volumes:
+      - kibana-data:/usr/share/kibana/data
+    ports:
+      - "5601:5601"
+    networks:
+      - elk-network
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:5601/api/status | grep -q 'available'"]
+      interval: 30s
+      timeout: 15s
+      retries: 10
+    restart: unless-stopped
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Filebeat — Agent de collecte des logs (optionnel, alternative à Logstash direct)
+  # ──────────────────────────────────────────────────────────────────────────
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.12.0
+    container_name: filebeat
+    user: root
+    command: filebeat -e -strict.perms=false
+    environment:
+      - ELASTICSEARCH_HOST=elasticsearch:9200
+      - KIBANA_HOST=kibana:5601
+    volumes:
+      - ./configs/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - /var/log/suricata:/var/log/suricata:ro
+      - filebeat-data:/usr/share/filebeat/data
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - elk-network
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      kibana:
+        condition: service_healthy
+    restart: unless-stopped
+    profiles:
+      - filebeat
+
+# ──────────────────────────────────────────────────────────────────────────────
+# VOLUMES — Persistance des données
+# ──────────────────────────────────────────────────────────────────────────────
+volumes:
+  elasticsearch-data:
+    driver: local
+  logstash-data:
+    driver: local
+  kibana-data:
+    driver: local
+  filebeat-data:
+    driver: local
+
+# ──────────────────────────────────────────────────────────────────────────────
+# RÉSEAU — Isolation des services ELK
+# ──────────────────────────────────────────────────────────────────────────────
+networks:
+  elk-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24

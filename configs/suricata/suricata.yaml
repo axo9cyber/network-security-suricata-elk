@@ -1,0 +1,227 @@
+%YAML 1.1
+---
+# =============================================================================
+# Suricata Configuration — Network Security Lab
+# Version : Suricata 7.x
+# Auteur  : axo9cyber
+# =============================================================================
+
+# Nom de l'instance (affiché dans les logs)
+vars:
+  address-groups:
+    HOME_NET: "[192.168.100.0/24]"
+    EXTERNAL_NET: "!$HOME_NET"
+    HTTP_SERVERS: "$HOME_NET"
+    SMTP_SERVERS: "$HOME_NET"
+    SQL_SERVERS: "$HOME_NET"
+    DNS_SERVERS: "$HOME_NET"
+    TELNET_SERVERS: "$HOME_NET"
+    AIM_SERVERS: "$EXTERNAL_NET"
+    DC_SERVERS: "$HOME_NET"
+    DNP3_SERVER: "$HOME_NET"
+    DNP3_CLIENT: "$HOME_NET"
+    MODBUS_CLIENT: "$HOME_NET"
+    MODBUS_SERVER: "$HOME_NET"
+    ENIP_CLIENT: "$HOME_NET"
+    ENIP_SERVER: "$HOME_NET"
+
+  port-groups:
+    HTTP_PORTS: "80"
+    SHELLCODE_PORTS: "!80"
+    ORACLE_PORTS: 1521
+    SSH_PORTS: 22
+    DNP3_PORTS: 20000
+    MODBUS_PORTS: 502
+    FILE_DATA_PORTS: "[$HTTP_PORTS,110,143]"
+    FTP_PORTS: 21
+    VXLAN_PORTS: 4789
+    TEREDO_PORTS: 3544
+
+# =============================================================================
+# OUTPUTS — EVE JSON pour ELK Stack
+# =============================================================================
+outputs:
+  # EVE JSON — format principal pour l'ingestion ELK
+  - eve-log:
+      enabled: yes
+      filetype: regular
+      filename: /var/log/suricata/eve.json
+      # Rotation quotidienne des logs
+      rotate-interval: day
+      # Types d'événements à enregistrer
+      types:
+        - alert:
+            # Inclure les paquets complets dans les alertes
+            payload: yes
+            payload-buffer-size: 4kb
+            payload-printable: yes
+            packet: yes
+            metadata: yes
+            http-body: yes
+            http-body-printable: yes
+            tagged-packets: yes
+        - anomaly:
+            enabled: yes
+            types:
+              decode: yes
+              stream: yes
+              applayer: yes
+        - http:
+            extended: yes
+        - dns:
+            query: yes
+            answer: yes
+        - tls:
+            extended: yes
+        - files:
+            force-magic: no
+        - smtp: {}
+        - ftp: {}
+        - ssh: {}
+        - flow: {}
+        - netflow: {}
+
+  # Log Suricata interne (erreurs, stats)
+  - fast:
+      enabled: yes
+      filename: /var/log/suricata/fast.log
+      append: yes
+
+  - stats:
+      enabled: yes
+      filename: /var/log/suricata/stats.log
+      append: yes
+      interval: 8
+
+# =============================================================================
+# CAPTURE — Interface réseau
+# =============================================================================
+af-packet:
+  - interface: eth0
+    # Nombre de threads de capture
+    threads: auto
+    cluster-id: 99
+    cluster-type: cluster_flow
+    defrag: yes
+    use-mmap: yes
+    tpacket-v3: yes
+    ring-size: 2048
+    block-size: 32768
+    block-timeout: 10
+    use-emergency-flush: yes
+
+# =============================================================================
+# RÈGLES
+# =============================================================================
+default-rule-path: /var/lib/suricata/rules
+
+rule-files:
+  - suricata.rules
+  - /etc/suricata/rules/local.rules
+
+# =============================================================================
+# MOTEUR DE DÉTECTION
+# =============================================================================
+detect:
+  profile: medium
+  custom-values:
+    toclient-groups: 3
+    toserver-groups: 25
+  sgh-mpm-context: auto
+  inspection-recursion-limit: 3000
+
+threading:
+  set-cpu-affinity: no
+  cpu-affinity:
+    - management-cpu-set:
+        cpu: [0]
+    - receive-cpu-set:
+        cpu: [0]
+    - worker-cpu-set:
+        cpu: ["all"]
+        mode: "exclusive"
+        prio:
+          low: [0]
+          medium: ["1-2"]
+          high: ["3"]
+          default: "medium"
+  detect-thread-ratio: 1.0
+
+# =============================================================================
+# PROTOCOLES APPLICATIFS
+# =============================================================================
+app-layer:
+  protocols:
+    tls:
+      enabled: yes
+      detection-ports:
+        dp: 443
+    http:
+      enabled: yes
+      libhtp:
+        default-config:
+          personality: IDS
+          request-body-limit: 100kb
+          response-body-limit: 100kb
+          request-body-minimal-inspect-size: 32kb
+          request-body-inspect-window: 4kb
+          response-body-minimal-inspect-size: 40kb
+          response-body-inspect-window: 16kb
+          double-decode-path: no
+          double-decode-query: no
+    ftp:
+      enabled: yes
+    smtp:
+      enabled: yes
+      raw-extraction: no
+      mime:
+        decode-mime: yes
+        decode-base64: yes
+        decode-quoted-printable: yes
+        header-value-depth: 2000
+        extract-urls: yes
+        body-md5: no
+      inspected-tracker:
+        content-limit: 100000
+        content-inspect-min-size: 32768
+        content-inspect-window: 4096
+    dns:
+      enabled: yes
+    ssh:
+      enabled: yes
+    dcerpc:
+      enabled: yes
+
+# =============================================================================
+# FLUX (Flow)
+# =============================================================================
+flow:
+  memcap: 128mb
+  hash-size: 65536
+  prealloc: 10000
+  emergency-recovery: 30
+
+# =============================================================================
+# STREAM TCP
+# =============================================================================
+stream:
+  memcap: 64mb
+  checksum-validation: yes
+  inline: no
+  reassembly:
+    memcap: 256mb
+    depth: 1mb
+    toserver-chunk-size: 2560
+    toclient-chunk-size: 2560
+    randomize-chunk-size: yes
+
+# =============================================================================
+# DÉCODEUR
+# =============================================================================
+defrag:
+  memcap: 32mb
+  hash-size: 65536
+  trackers: 65535
+  max-frags: 65535
+  prealloc: yes
+  timeout: 60

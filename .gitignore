@@ -1,0 +1,51 @@
+# Logs et données sensibles
+*.log
+/var/log/
+
+# Données Elasticsearch (volumes Docker locaux)
+elasticsearch-data/
+logstash-data/
+kibana-data/
+filebeat-data/
+
+# Captures Suricata brutes
+*.pcap
+*.pcapng
+
+# Fichiers d'environnement
+.env
+.env.local
+*.env
+
+# Résultats de scans (ne pas committer)
+/tmp/nmap_*.txt
+/tmp/nikto_*.txt
+*.nmap
+
+# Sauvegardes de configuration
+*.bak
+*.bak.*
+
+# Clés et certificats
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+# Fichiers macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Fichiers Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Fichiers d'édition
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
